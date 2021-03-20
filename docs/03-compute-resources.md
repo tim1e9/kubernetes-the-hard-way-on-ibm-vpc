@@ -94,7 +94,8 @@ By default, the network ACL allows all incoming and outgoing connections. We'll 
 open, but we'll want to lock down traffic coming into the subnet. Specifically, we'll limit incoming traffic
 to SSH, ICMP, and HTTPS.
 
-Since the network ACL ID is used quite a bit, we'll use a variable:
+Since the network ACL ID is used quite a bit, we've used a variable - `NACL_ID`. If you haven't yet set it,
+you can do it now with the following command:
 
 `NACL_ID=$(ibmcloud is network-acls --resource-group-id $RG_ID --output JSON | jq -r .[0].id)`
 
