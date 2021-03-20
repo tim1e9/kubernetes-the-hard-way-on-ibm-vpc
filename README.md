@@ -1,6 +1,15 @@
-# Kubernetes The Hard Way
+# Kubernetes The Hard Way - On IBM VPC
 
-This tutorial walks you through setting up Kubernetes the hard way. This guide is not for people looking for a fully automated command to bring up a Kubernetes cluster. If that's you then check out [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine), or the [Getting Started Guides](https://kubernetes.io/docs/setup).
+This tutorial is a fork of the great work that Kelsey Hightower originally created. And quite
+frankly, all I've done is convert this Google Cloud directions into the IBM Virtual Private
+Cloud (VPC) equivalent. I strongly recommend you read and star
+[his repo](https://github.com/kelseyhightower/kubernetes-the-hard-way).
+
+
+There are several automated ways to install and configure Kubernetes. Unfortunately, I believe
+that they short-change your overall understanding of the platform. So from a learning perspective,
+it's important to grasp what automation is doing for you. Besides, rolling up our colective sleeves
+and getting something working from scratch is fun. (Well, for many of us it is.)
 
 Kubernetes The Hard Way is optimized for learning, which means taking the long route to ensure you understand each task required to bootstrap a Kubernetes cluster.
 
@@ -15,6 +24,9 @@ Kubernetes The Hard Way is optimized for learning, which means taking the long r
 
 The target audience for this tutorial is someone planning to support a production Kubernetes cluster and wants to understand how everything fits together.
 
+The IBM VPC fork has been created for those who don't necessarily have access to Google Cloud, but do
+have access to the IBM Cloud.
+
 ## Cluster Details
 
 Kubernetes The Hard Way guides you through bootstrapping a highly available Kubernetes cluster with end-to-end encryption between components and RBAC authentication.
@@ -27,7 +39,9 @@ Kubernetes The Hard Way guides you through bootstrapping a highly available Kube
 
 ## Labs
 
-This tutorial assumes you have access to the [Google Cloud Platform](https://cloud.google.com). While GCP is used for basic infrastructure requirements the lessons learned in this tutorial can be applied to other platforms.
+This tutorial assumes you have access to the [IBM Cloud Platform](https://cloud.ibm.com/). For
+a version of this tutorial for the Google Cloud Platform, please see the original work by
+Kelsey Hightower: [Kubernetes the Hard Way](https://github.com/kelseyhightower/kubernetes-the-hard-way) 
 
 * [Prerequisites](docs/01-prerequisites.md)
 * [Installing the Client Tools](docs/02-client-tools.md)

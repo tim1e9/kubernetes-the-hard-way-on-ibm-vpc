@@ -1,8 +1,35 @@
 # Provisioning Compute Resources
 
-Kubernetes requires a set of machines to host the Kubernetes control plane and the worker nodes where containers are ultimately run. In this lab you will provision the compute resources required for running a secure and highly available Kubernetes cluster across a single [compute zone](https://cloud.google.com/compute/docs/regions-zones/regions-zones).
+Kubernetes requires a set of machines to host the Kubernetes control plane and the worker nodes where containers are ultimately run. In this lab you will provision the compute resources required for running a secure and highly available Kubernetes cluster across a single availability zone.
 
-> Ensure a default compute zone and region have been set as described in the [Prerequisites](01-prerequisites.md#set-a-default-compute-region-and-zone) lab.
+> Ensure a default availability zone and region have been set as described in the [Prerequisites](01-prerequisites.md#set-a-default-compute-region-and-zone) lab.
+
+## Unique Identifiers
+
+A number of resources must be referenced by their unique identifier. This is not the same as the name of the resource.
+In an effort to make this simpler to manage, environmefnt variables will be used. 
+
+## Resource Groups
+
+A resource group is a way for you to organize your account resources in customizable groupings.
+Resource groups help control access, and provide a way to filter items when a large number of
+users all work in the same account.
+
+For this tutorial, we'll use a single resource group for all of our resources.
+
+To create a resource group:
+
+`RG_ID=$(ibmcloud resource group-create kube-thw-ibmvpc-rg --output JSON | jq -r .id)`
+
+Or, if you prefer to not store the ID in an environment variable:
+
+`ibmcloud resource group-create kube-thw-ibmvpc-rg`
+
+To show details about the newly created resource group:
+
+`ibmcloud resource group kube-thw-ibmvpc-rg`
+
+
 
 ## Networking
 
@@ -12,87 +39,139 @@ The Kubernetes [networking model](https://kubernetes.io/docs/concepts/cluster-ad
 
 ### Virtual Private Cloud Network
 
-In this section a dedicated [Virtual Private Cloud](https://cloud.google.com/compute/docs/networks-and-firewalls#networks) (VPC) network will be setup to host the Kubernetes cluster.
+In this section a dedicated [Virtual Private Cloud](https://www.ibm.com/cloud/learn/vpc) (VPC) network will be setup to host the Kubernetes cluster.
+
+#### Create the VPC
 
 Create the `kubernetes-the-hard-way` custom VPC network:
 
+`VPC_ID=$(ibmcloud is vpc-create kube-thw-ibmvpc-vpc --resource-group-id $RG_ID --output JSON | jq -r .id)`
+
+To viw the details of the VPC, type:
+
+`ibmcloud is vpc $VPC_ID`
+
+**Optional:** You may notice silly names for the default ACL, Security Group, and Routing Table associated with the
+VPC. At this point, it's possible to rename them. To do this, take note of the output from the previous command
+and apply different names: 
+
 ```
-gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+SG1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_security_group.id)
+#ibmcloud is security-group-update $SG1 --name kube-thw-sg1
+NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_network_acl.id)
+ibmcloud is network-acl-update $NACL_ID --name kube-thw-nacl1
+RT1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
+ibmcloud is vpc-routing-table-update $VPC_ID $RT1 --name kube-thw-rt1
 ```
 
-A [subnet](https://cloud.google.com/compute/docs/vpc/#vpc_networks_and_subnets) must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
+After these updates, the names may be simpler to understand.
+
+#### Create a Subnet
+
+A subnet must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
 
 Create the `kubernetes` subnet in the `kubernetes-the-hard-way` VPC network:
 
-```
-gcloud compute networks subnets create kubernetes \
-  --network kubernetes-the-hard-way \
-  --range 10.240.0.0/24
-```
+`VPC_SUBNET_ID=$(ibmcloud is subnet-create kube-thw-ibmvpc-subnet1 $VPC_ID --ipv4-address-count 256 --zone us-south-1 --resource-group-id $RG_ID --output JSON | jq -r .id)`
 
-> The `10.240.0.0/24` IP address range can host up to 254 compute instances.
+To view all subnets within the previously created resource group, type:
 
-### Firewall Rules
+`ibmcloud is subnets --resource-group-id $RG_ID`
 
-Create a firewall rule that allows internal communication across all protocols:
 
-```
-gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
-  --allow tcp,udp,icmp \
-  --network kubernetes-the-hard-way \
-  --source-ranges 10.240.0.0/24,10.200.0.0/16
-```
+### Firewall Rules -> Access Control Lists (ACLs)
 
-Create a firewall rule that allows external SSH, ICMP, and HTTPS:
+Access to an IBM VPC can be limited by leveraging either security groups
+or access control lists (ACLs):
 
-```
-gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
-  --allow tcp:22,tcp:6443,icmp \
-  --network kubernetes-the-hard-way \
-  --source-ranges 0.0.0.0/0
-```
+ - An Access Control List (ACL) can manage inbound and outbound traffic for a subnet
+ - A security group acts as a virtual firewall that controls the traffic for one or more virtual server instances
 
-> An [external load balancer](https://cloud.google.com/compute/docs/load-balancing/network/) will be used to expose the Kubernetes API Servers to remote clients.
+To set up firewall rules for the subnet, we'll use an ACL. In fact, we'll refine the default ACL that was
+created when we created the VPC.
 
-List the firewall rules in the `kubernetes-the-hard-way` VPC network:
+By default, the network ACL allows all incoming and outgoing connections. We'll want to keep outgoing connections
+open, but we'll want to lock down traffic coming into the subnet. Specifically, we'll limit incoming traffic
+to SSH, ICMP, and HTTPS.
 
-```
-gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
-```
+Since the network ACL ID is used quite a bit, we'll use a variable:
 
-> output
+`NACL_ID=$(ibmcloud is network-acls --resource-group-id $RG_ID --output JSON | jq -r .[0].id)`
+
+To see the details of the ACL:
+
+`ibmcloud is network-acl $NACL_ID`
+
+Update the rules appropriately:
 
 ```
-NAME                                    NETWORK                  DIRECTION  PRIORITY  ALLOW                 DENY  DISABLED
-kubernetes-the-hard-way-allow-external  kubernetes-the-hard-way  INGRESS    1000      tcp:22,tcp:6443,icmp        False
-kubernetes-the-hard-way-allow-internal  kubernetes-the-hard-way  INGRESS    1000      tcp,udp,icmp                Fals
+ibmcloud is network-acl-rule-delete $NACL_ID {id of allow-inbound}
+ibmcloud is network-acl-rule-add $NACL_ID deny inbound tcp 0.0.0.0/0 0.0.0.0/0 --name block-inbound
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name ssh1 --source-port-min 22 --source-port-max 22 --destination-port-min 22 --destination-port-max 22 \
+  --before-rule-id 1d784b30-e2ce-4b90-ba45-a8a6304146b4 
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name https1 --source-port-min 443 --source-port-max 443 --destination-port-min 443 --destination-port-max 443 \
+  --before-rule-id 1d784b30-e2ce-4b90-ba45-a8a6304146b4 
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound icmp 0.0.0.0/0 0.0.0.0/0 \
+  --name allow-icmp --before-rule-id 1d784b30-e2ce-4b90-ba45-a8a6304146b4
 ```
+
+To view all newly-updated ACL rules, use the same command as mentioned above:
+
+`ibmcloud is network-acl $NACL_ID`
+
+
+For more information about security within a VPC, please refer to:
+https://cloud.ibm.com/docs/vpc?topic=vpc-security-in-your-vpc
+
+
+> An [external load balancer](https://www.ibm.com/) will be used to expose the Kubernetes API Servers to remote clients.
+
 
 ### Kubernetes Public IP Address
 
 Allocate a static IP address that will be attached to the external load balancer fronting the Kubernetes API Servers:
 
+`ibmcloud is floating-ip-reserve kube-thw-fip1 --zone us-south-1 --resource-group-name kube-thw-ibmvpc-rg`
+
+## Configuring SSH Access
+
+SSH will be used to configure the controller and worker instances. The simplest way to configure SSH is to create
+an SSH key resource within the resource group.
+
+### Create a public / private keypair
+
+To generate a key pair, run the following command:
+`ssh-keygen -t rsa -b 4096 -C "kubethw"`
+
+Sample command with output:
 ```
-gcloud compute addresses create kubernetes-the-hard-way \
-  --region $(gcloud config get-value compute/region)
+> ssh-keygen -t rsa -b 4096 -C "kubethw"
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/someuser/.ssh/id_rsa): /home/someuser/.ssh/kubethw_id_rsa
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/someuser/.ssh/kubethw_id_rsa
+Your public key has been saved in /home/someuser/.ssh/kubethw_id_rsa.pub
 ```
 
-Verify the `kubernetes-the-hard-way` static IP address was created in your default compute region:
+### Import the key into the VPC
 
-```
-gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
-```
+`SSH_KEY_ID=$(ibmcloud is key-create kube-thw-ssh-key @/home/someuser/.ssh/kubethw_id_rsa.pub --resource-group-id $RG_ID --output JSON | jq -r .id)`
 
-> output
 
-```
-NAME                     ADDRESS/RANGE   TYPE      PURPOSE  NETWORK  REGION    SUBNET  STATUS
-kubernetes-the-hard-way  XX.XXX.XXX.XXX  EXTERNAL                    us-west1          RESERVED
-```
-
-## Compute Instances
+## Compute Instances (Virtual Server Instances)
 
 The compute instances in this lab will be provisioned using [Ubuntu Server](https://www.ubuntu.com/server) 20.04, which has good support for the [containerd container runtime](https://github.com/containerd/containerd). Each compute instance will be provisioned with a fixed private IP address to simplify the Kubernetes bootstrapping process.
+
+First, we need to select the correct image to use. To see a list of all Ubuntu images which are available:
+
+`ibmcloud is images --output JSON | jq '.[] | select(.operating_system.family=="Ubuntu Linux") | {id: .id, name: .name}'`
+
+We'll again use an environment variable to store the name of the image:
+
+`IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')`
 
 ### Kubernetes Controllers
 
@@ -100,23 +179,14 @@ Create three compute instances which will host the Kubernetes control plane:
 
 ```
 for i in 0 1 2; do
-  gcloud compute instances create controller-${i} \
-    --async \
-    --boot-disk-size 200GB \
-    --can-ip-forward \
-    --image-family ubuntu-2004-lts \
-    --image-project ubuntu-os-cloud \
-    --machine-type e2-standard-2 \
-    --private-network-ip 10.240.0.1${i} \
-    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
-    --subnet kubernetes \
-    --tags kubernetes-the-hard-way,controller
+  ibmcloud is instance-create controller-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
+  --key-ids $SSH_KEY_ID --security-group-ids $SG1 --resource-group-id $RG_ID --output JSON
 done
 ```
 
 ### Kubernetes Workers
 
-Each worker instance requires a pod subnet allocation from the Kubernetes cluster CIDR range. The pod subnet allocation will be used to configure container networking in a later exercise. The `pod-cidr` instance metadata will be used to expose pod subnet allocations to compute instances at runtime.
+Each worker instance requires a pod subnet allocation from the Kubernetes cluster CIDR range. The pod subnet allocation will be used to configure container networking in a later exercise. The name of the worker node will be used to expose pod subnet allocations to compute instances at runtime.
 
 > The Kubernetes cluster CIDR range is defined by the Controller Manager's `--cluster-cidr` flag. In this tutorial the cluster CIDR range will be set to `10.200.0.0/16`, which supports 254 subnets.
 
@@ -124,104 +194,65 @@ Create three compute instances which will host the Kubernetes worker nodes:
 
 ```
 for i in 0 1 2; do
-  gcloud compute instances create worker-${i} \
-    --async \
-    --boot-disk-size 200GB \
-    --can-ip-forward \
-    --image-family ubuntu-2004-lts \
-    --image-project ubuntu-os-cloud \
-    --machine-type e2-standard-2 \
-    --metadata pod-cidr=10.200.${i}.0/24 \
-    --private-network-ip 10.240.0.2${i} \
-    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
-    --subnet kubernetes \
-    --tags kubernetes-the-hard-way,worker
+  ibmcloud is instance-create worker-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
+  --key-ids $SSH_KEY_ID --security-group-ids $SG1 --resource-group-id $RG_ID --ipv4 10.240.0.2${i}
 done
 ```
 
+
 ### Verification
 
-List the compute instances in your default compute zone:
+List the compute instances in your resource group:
+
+`ibmcloud is instances --resource-group-id $RG_ID`
+
+### Updating Environment Variables
+
+If you accidentally exit a terminal, it may be painful to re-assign all variables. The following should help:
 
 ```
-gcloud compute instances list --filter="tags.items=kubernetes-the-hard-way"
+RG_ID=$(ibmcloud resource group kube-thw-ibmvpc-rg --output JSON | jq -r .[0].id)
+VPC_ID=$(ibmcloud is vpcs --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
+SG1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_security_group.id)
+NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_network_acl.id)
+RT1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
+VPC_SUBNET_ID=$(ibmcloud is subnets --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
+SSH_KEY_ID=$(ibmcloud is keys --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
+IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
 ```
 
-> output
-
-```
-NAME          ZONE        MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
-controller-0  us-west1-c  e2-standard-2               10.240.0.10  XX.XX.XX.XXX   RUNNING
-controller-1  us-west1-c  e2-standard-2               10.240.0.11  XX.XXX.XXX.XX  RUNNING
-controller-2  us-west1-c  e2-standard-2               10.240.0.12  XX.XXX.XX.XXX  RUNNING
-worker-0      us-west1-c  e2-standard-2               10.240.0.20  XX.XX.XXX.XXX  RUNNING
-worker-1      us-west1-c  e2-standard-2               10.240.0.21  XX.XX.XX.XXX   RUNNING
-worker-2      us-west1-c  e2-standard-2               10.240.0.22  XX.XXX.XX.XX   RUNNING
-```
-
-## Configuring SSH Access
-
-SSH will be used to configure the controller and worker instances. When connecting to compute instances for the first time SSH keys will be generated for you and stored in the project or instance metadata as described in the [connecting to instances](https://cloud.google.com/compute/docs/instances/connecting-to-instance) documentation.
+## Log into a VSI
 
 Test SSH access to the `controller-0` compute instances:
 
-```
-gcloud compute ssh controller-0
-```
+1. Temporarily assign the floating IP address to an instance
 
-If this is your first time connecting to a compute instance SSH keys will be generated for you. Enter a passphrase at the prompt to continue:
+    `ibmcloud is instances --resource-group-id $RG_ID`
 
-```
-WARNING: The public SSH key file for gcloud does not exist.
-WARNING: The private SSH key file for gcloud does not exist.
-WARNING: You do not have an SSH key for gcloud.
-WARNING: SSH keygen will be executed to generate a key.
-Generating public/private rsa key pair.
-Enter passphrase (empty for no passphrase):
-Enter same passphrase again:
-```
+    (Make a note of the instance ID)
 
-At this point the generated SSH keys will be uploaded and stored in your project:
+    `ibmcloud is instance-network-interfaces [instance id]`
 
-```
-Your identification has been saved in /home/$USER/.ssh/google_compute_engine.
-Your public key has been saved in /home/$USER/.ssh/google_compute_engine.pub.
-The key fingerprint is:
-SHA256:nz1i8jHmgQuGt+WscqP5SeIaSy5wyIJeL71MuV+QruE $USER@$HOSTNAME
-The key's randomart image is:
-+---[RSA 2048]----+
-|                 |
-|                 |
-|                 |
-|        .        |
-|o.     oS        |
-|=... .o .o o     |
-|+.+ =+=.+.X o    |
-|.+ ==O*B.B = .   |
-| .+.=EB++ o      |
-+----[SHA256]-----+
-Updating project ssh metadata...-Updated [https://www.googleapis.com/compute/v1/projects/$PROJECT_ID].
-Updating project ssh metadata...done.
-Waiting for SSH key to propagate.
-```
+    (Make a note of the NIC ID)
 
-After the SSH keys have been updated you'll be logged into the `controller-0` instance:
+    `ibmcloud is floating-ips --resource-group-id $RG_ID`
 
-```
-Welcome to Ubuntu 20.04 LTS (GNU/Linux 5.4.0-1019-gcp x86_64)
-...
-```
+    (Make a note of the Floating IP ID)
 
-Type `exit` at the prompt to exit the `controller-0` compute instance:
+    `ibmcloud is instance-network-interface-floating-ip-add [instance ID] [NIC ID] [Floating IP ID]`
 
-```
-$USER@controller-0:~$ exit
-```
-> output
+2. Using the previously-created public/private key, SSH to the instance 
+    
+    `ssh -i ~/.ssh/kubethw_id_rsa ubuntu@[Floating IP Address]`
 
-```
-logout
-Connection to XX.XX.XX.XXX closed
-```
+3. Verify that you have access
 
+    `pwd`
+
+4. Log out and release the floating IP address. You may also want to delete the `known_hosts` entry for the IP address.
+    `exit`
+
+    `ibmcloud is instance-network-interface-floating-ip-remove [instance ID] [NIC ID] [Floating IP ID]`
+
+    
 Next: [Provisioning a CA and Generating TLS Certificates](04-certificate-authority.md)

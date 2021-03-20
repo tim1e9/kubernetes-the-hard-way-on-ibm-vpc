@@ -1,54 +1,66 @@
 # Prerequisites
 
-## Google Cloud Platform
+## IBM Cloud Platform
 
-This tutorial leverages the [Google Cloud Platform](https://cloud.google.com/) to streamline provisioning of the compute infrastructure required to bootstrap a Kubernetes cluster from the ground up. [Sign up](https://cloud.google.com/free/) for $300 in free credits.
+This tutorial leverages the [IBM Cloud Platform](https://cloud.ibm.com/) to streamline provisioning of the compute infrastructure required to bootstrap a Kubernetes cluster from the ground up. [Sign up](https://cloud.ibm.com/registration) to get an account.
 
-[Estimated cost](https://cloud.google.com/products/calculator#id=873932bc-0840-4176-b0fa-a8cfd4ca61ae) to run this tutorial: $0.23 per hour ($5.50 per day).
+Estimated costs - TBD
 
-> The compute resources required for this tutorial exceed the Google Cloud Platform free tier.
 
-## Google Cloud Platform SDK
+## IBM Cloud Command Line Interface (CLI)
 
-### Install the Google Cloud SDK
+### Install the CLI
 
-Follow the Google Cloud SDK [documentation](https://cloud.google.com/sdk/) to install and configure the `gcloud` command line utility.
+To get started, it's necessary to download and install the IBM Cloud Command Line Interface (CLI). Detailed instructions can be found [here](https://cloud.ibm.com/docs/cli?topic=cli-getting-started).
 
-Verify the Google Cloud SDK version is 301.0.0 or higher:
+Briefly, the steps to follow are:
+1. Download a shell script which pulls and installs the code
+2. Verify the CLI has been installed: In a terminal, type `ibmcloud -v`
+3. View the plugins that have been installed as part of the base installation: `ibmcloud plugin list`
+   If you don't see "vpc-infrastructure", then you'll need to install it:
+   - `ibmcloud plugin install vpc-infrastructure`
+   - `ibmcloud plugin update`
+   - `ibmcloud plugin list`
+   You should now see the VPC plugin in the list.
 
-```
-gcloud version
-```
+   Below is sample output from running the `ibmcloud plugin list` command:
+    ```
+    $ ibmcloud plugin list
+    Listing installed plug-ins...
 
-### Set a Default Compute Region and Zone
+    Plugin Name                                 Version   Status   Private endpoints supported
+    cloud-functions/wsk/functions/fn            1.0.49             false
+    cloud-object-storage                        1.2.2              false
+    container-registry                          0.1.514            false
+    container-service/kubernetes-service        1.0.233            false
+    vpc-infrastructure/infrastructure-service   0.7.9              false
+    ```
+4. Log in to the cloud via either traditional credentials or via SSO:
+   - traditional: `ibmcloud login`
+   - via SSO: `ibmcloud login -sso`
+5. As part of the login process, select an appropriate account. If you only have a single account,
+   then you may not be prompted to select one.
+6. The login process will also ask you to select a region. Be sure to select one that's close to
+   you. This tutorial will assume you're using `us-south`.
 
-This tutorial assumes a default compute region and zone have been configured.
+### Specify a Cloud Region and Zone
 
-If you are using the `gcloud` command-line tool for the first time `init` is the easiest way to do this:
+Although the region can be selected as part of the login process, it's also possible to change
+the region you're using after logging in. To list all available regions:
 
-```
-gcloud init
-```
+`ibmcloud is regions`
 
-Then be sure to authorize gcloud to access the Cloud Platform with your Google user credentials:
+To select a default region, such as us-south:
 
-```
-gcloud auth login
-```
+`ibmcloud is region us-south`
 
-Next set a default compute region and compute zone:
+Similarly, to see all availability zones within a region, use the following command:
 
-```
-gcloud config set compute/region us-west1
-```
+`ibmcloud is zones`
 
-Set a default compute zone:
+And to set a default zone, such as us-south-1, use the following command:
 
-```
-gcloud config set compute/zone us-west1-c
-```
-
-> Use the `gcloud compute zones list` command to view additional regions and zones.
+`ibmcloud is zone us-south-1`
 
 ## Running Commands in Parallel with tmux
 
