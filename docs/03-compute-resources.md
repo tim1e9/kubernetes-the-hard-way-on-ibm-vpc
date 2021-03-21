@@ -51,18 +51,23 @@ To viw the details of the VPC, type:
 
 `ibmcloud is vpc $VPC_ID`
 
-**Optional:** You may notice silly names for the default ACL, Security Group, and Routing Table associated with the
+**NOTE:** You may notice silly names for the default ACL, Security Group, and Routing Table associated with the
 VPC. At this point, it's possible to rename them. To do this, take note of the output from the previous command
 and apply different names: 
 
 ```
 SG1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_security_group.id)
-#ibmcloud is security-group-update $SG1 --name kube-thw-sg1
+ibmcloud is security-group-update $SG1 --name kube-thw-sg1
 NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_network_acl.id)
 ibmcloud is network-acl-update $NACL_ID --name kube-thw-nacl1
 RT1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
 ibmcloud is vpc-routing-table-update $VPC_ID $RT1 --name kube-thw-rt1
 ```
+
+Once the silly names have been replaced, it's necessary to add a rule to the security group:
+
+`ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 22 --port-max 22`
+`ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 443 --port-max 443`
 
 After these updates, the names may be simpler to understand.
 
@@ -106,16 +111,17 @@ To see the details of the ACL:
 Update the rules appropriately:
 
 ```
-ibmcloud is network-acl-rule-delete $NACL_ID {id of allow-inbound}
-ibmcloud is network-acl-rule-add $NACL_ID deny inbound tcp 0.0.0.0/0 0.0.0.0/0 --name block-inbound
+RULE_ID_TO_DELETE=$(ibmcloud is network-acl-rules $NACL_ID --output JSON | jq -r '.[] | select(.name=="allow-inbound") | .id')
+ibmcloud is network-acl-rule-delete $NACL_ID $RULE_ID_TO_DELETE -f
+BLOCK_RULE_ID=$(ibmcloud is network-acl-rule-add $NACL_ID deny inbound tcp 0.0.0.0/0 0.0.0.0/0 --name block-inbound --output JSON | jq -r .id)
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
-  --name ssh1 --source-port-min 22 --source-port-max 22 --destination-port-min 22 --destination-port-max 22 \
-  --before-rule-id 1d784b30-e2ce-4b90-ba45-a8a6304146b4 
+  --name ssh1 --source-port-min 1 --source-port-max 65535 --destination-port-min 22 --destination-port-max 22 \
+  --before-rule-id $BLOCK_RULE_ID
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
-  --name https1 --source-port-min 443 --source-port-max 443 --destination-port-min 443 --destination-port-max 443 \
-  --before-rule-id 1d784b30-e2ce-4b90-ba45-a8a6304146b4 
+  --name https1 --source-port-min 1 --source-port-max 65535 --destination-port-min 443 --destination-port-max 443 \
+  --before-rule-id $BLOCK_RULE_ID 
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound icmp 0.0.0.0/0 0.0.0.0/0 \
-  --name allow-icmp --before-rule-id 1d784b30-e2ce-4b90-ba45-a8a6304146b4
+  --name allow-icmp --before-rule-id $BLOCK_RULE_ID
 ```
 
 To view all newly-updated ACL rules, use the same command as mentioned above:
@@ -134,7 +140,7 @@ https://cloud.ibm.com/docs/vpc?topic=vpc-security-in-your-vpc
 
 Allocate a static IP address that will be attached to the external load balancer fronting the Kubernetes API Servers:
 
-`ibmcloud is floating-ip-reserve kube-thw-fip1 --zone us-south-1 --resource-group-name kube-thw-ibmvpc-rg`
+`FLOAT_IP1=$(ibmcloud is floating-ip-reserve kube-thw-fip1 --zone us-south-1 --resource-group-name kube-thw-ibmvpc-rg --output JSON | jq -r .id)`
 
 ## Configuring SSH Access
 
@@ -181,7 +187,7 @@ Create three compute instances which will host the Kubernetes control plane:
 ```
 for i in 0 1 2; do
   ibmcloud is instance-create controller-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
-  --key-ids $SSH_KEY_ID --security-group-ids $SG1 --resource-group-id $RG_ID --output JSON
+  --key-ids $SSH_KEY_ID --security-group-ids $SG1 --resource-group-id $RG_ID
 done
 ```
 
@@ -255,5 +261,56 @@ Test SSH access to the `controller-0` compute instances:
 
     `ibmcloud is instance-network-interface-floating-ip-remove [instance ID] [NIC ID] [Floating IP ID]`
 
-    
+# Summary
+
+In this section of the tutorial, you provisioned the necessary VPC components to support a Kubernetes deployment.
+An abbreviated collection of commands are listed here, in case you revisit this tutorial, and simply want to
+start at the next step.
+
+Steps, in aggregate:
+
+```
+RG_ID=$(ibmcloud resource group-create kube-thw-ibmvpc-rg --output JSON | jq -r .id)
+VPC_ID=$(ibmcloud is vpc-create kube-thw-ibmvpc-vpc --resource-group-id $RG_ID --output JSON | jq -r .id)
+
+SG1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_security_group.id)
+ibmcloud is security-group-update $SG1 --name kube-thw-sg1
+NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_network_acl.id)
+ibmcloud is network-acl-update $NACL_ID --name kube-thw-nacl1
+RT1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
+ibmcloud is vpc-routing-table-update $VPC_ID $RT1 --name kube-thw-rt1
+
+ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 22 --port-max 22
+ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 443 --port-max 443
+
+VPC_SUBNET_ID=$(ibmcloud is subnet-create kube-thw-ibmvpc-subnet1 $VPC_ID --ipv4-address-count 256 --zone us-south-1 --resource-group-id $RG_ID --output JSON | jq -r .id)
+
+RULE_ID_TO_DELETE=$(ibmcloud is network-acl-rules $NACL_ID --output JSON | jq -r '.[] | select(.name=="allow-inbound") | .id')
+ibmcloud is network-acl-rule-delete $NACL_ID $RULE_ID_TO_DELETE -f
+BLOCK_RULE_ID=$(ibmcloud is network-acl-rule-add $NACL_ID deny inbound tcp 0.0.0.0/0 0.0.0.0/0 --name block-inbound --output JSON | jq -r .id)
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name ssh1 --source-port-min 1 --source-port-max 65535 --destination-port-min 22 --destination-port-max 22 \
+  --before-rule-id $BLOCK_RULE_ID
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name https1 --source-port-min 1 --source-port-max 65535 --destination-port-min 443 --destination-port-max 443 \
+  --before-rule-id $BLOCK_RULE_ID 
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound icmp 0.0.0.0/0 0.0.0.0/0 \
+  --name allow-icmp --before-rule-id $BLOCK_RULE_ID
+
+FLOAT_IP1=$(ibmcloud is floating-ip-reserve kube-thw-fip1 --zone us-south-1 --resource-group-name kube-thw-ibmvpc-rg --output JSON | jq -r .id)
+SSH_KEY_ID=$(ibmcloud is key-create kube-thw-ssh-key @/home/someuser/.ssh/kubethw_id_rsa.pub --resource-group-id $RG_ID --output JSON | jq -r .id)
+IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
+
+for i in 0 1 2; do
+  ibmcloud is instance-create controller-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
+  --key-ids $SSH_KEY_ID --security-group-ids $SG1 --resource-group-id $RG_ID
+done
+
+for i in 0 1 2; do
+  ibmcloud is instance-create worker-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
+  --key-ids $SSH_KEY_ID --security-group-ids $SG1 --resource-group-id $RG_ID --ipv4 10.240.0.2${i}
+done
+```
+
+
 Next: [Provisioning a CA and Generating TLS Certificates](04-certificate-authority.md)

@@ -2,6 +2,37 @@
 
 In this lab you will provision a [PKI Infrastructure](https://en.wikipedia.org/wiki/Public_key_infrastructure) using CloudFlare's PKI toolkit, [cfssl](https://github.com/cloudflare/cfssl), then use it to bootstrap a Certificate Authority, and generate TLS certificates for the following components: etcd, kube-apiserver, kube-controller-manager, kube-scheduler, kubelet, and kube-proxy.
 
+## Background - Connecting to Compute Resources
+
+Because we haven't provided public IP addresses for all of the servers, they won't be accessible over the internet.
+To get around this, we'll assign a public IP address to the `controller-0` instance, and then use it as a "jump machine"
+to access the rest of the resources in the subnet.
+
+Assign the previously created Floating IP address to the `controller-0` VSI:
+
+```
+PUB_IP_ADDR=$(ibmcloud is floating-ip $FLOAT_IP1 --output JSON | jq -r .address)
+VSI_CTRL_0=$(ibmcloud is instances --resource-group-id $RG_ID --output JSON | jq -r '.[] | select(.name=="controller-0") | .id')
+NIC1=$(ibmcloud is instance-network-interfaces $VSI_CTRL_0 --output JSON | jq -r .[].id)
+ibmcloud is instance-network-interface-floating-ip-add $VSI_CTRL_0 $NIC1 $FLOAT_IP1
+```
+
+Now that the controller has a public IP address, it's possible to connect to it via SSH. To test the connection,
+use the following command:
+
+`ssh -i ~/.ssh/kubethw_id_rsa root@$PUB_IP_ADDR`
+
+You may be prompted to verify the authenticity of the connection. Once verified, you should be logged in.
+
+Next, we need to connect to a worker node. You may recall that we set the IP address of worker-0 to 10.240.0.20.
+We'll use that information to "Jump" from the public machine to the other (non-public) machines.
+
+To test Jump connectivity, use the following command:
+
+`ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" root@10.240.0.20`
+
+After verifying the authenticity of the connection, you should be logged into the worker-0 VSI.
+
 ## Certificate Authority
 
 In this section you will provision a Certificate Authority that can be used to generate additional TLS certificates.
@@ -112,6 +143,7 @@ Kubernetes uses a [special-purpose authorization mode](https://kubernetes.io/doc
 Generate a certificate and private key for each Kubernetes worker node:
 
 ```
+IP_COUNTER=0
 for instance in worker-0 worker-1 worker-2; do
 cat > ${instance}-csr.json <<EOF
 {
@@ -132,17 +164,14 @@ cat > ${instance}-csr.json <<EOF
 }
 EOF
 
-EXTERNAL_IP=$(gcloud compute instances describe ${instance} \
-  --format 'value(networkInterfaces[0].accessConfigs[0].natIP)')
-
-INTERNAL_IP=$(gcloud compute instances describe ${instance} \
-  --format 'value(networkInterfaces[0].networkIP)')
+INTERNAL_IP=10.240.0.2$IP_COUNTER
+let IP_COUNTER+=1
 
 cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=${instance},${EXTERNAL_IP},${INTERNAL_IP} \
+  -hostname=${instance},${INTERNAL_IP} \
   -profile=kubernetes \
   ${instance}-csr.json | cfssljson -bare ${instance}
 done
@@ -299,9 +328,7 @@ Generate the Kubernetes API Server certificate and private key:
 ```
 {
 
-KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
-  --region $(gcloud config get-value compute/region) \
-  --format 'value(address)')
+KUBERNETES_PUBLIC_ADDRESS=$FLOAT_IP1
 
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
