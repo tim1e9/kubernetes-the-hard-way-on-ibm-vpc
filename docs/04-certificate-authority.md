@@ -416,23 +416,26 @@ service-account-key.pem
 service-account.pem
 ```
 
-
 ## Distribute the Client and Server Certificates
+
 
 Copy the appropriate certificates and private keys to each worker instance:
 
 ```
-for instance in worker-0 worker-1 worker-2; do
-  gcloud compute scp ca.pem ${instance}-key.pem ${instance}.pem ${instance}:~/
-done
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem worker-0-key.pem worker-0.pem root@10.240.0.20:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem worker-1-key.pem worker-1.pem root@10.240.0.21:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem worker-2-key.pem worker-2.pem root@10.240.0.22:~/
 ```
 
 Copy the appropriate certificates and private keys to each controller instance:
 
+Gather a list of all controller nodes:
+`CTRL_IPS=$(ibmcloud is instances --resource-group-id $RG_ID --output JSON | jq -r '.[] | select(.name | contains("controller")) | .primary_network_interface.primary_ipv4_address')`
+
 ```
-for instance in controller-0 controller-1 controller-2; do
-  gcloud compute scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
-    service-account-key.pem service-account.pem ${instance}:~/
+
+for instance in $CTRL_IPS; do
+  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem root@${instance}:~/
 done
 ```
 
