@@ -22,7 +22,8 @@ use the following command:
 
 `ssh -i ~/.ssh/kubethw_id_rsa root@$PUB_IP_ADDR`
 
-You may be prompted to verify the authenticity of the connection. Once verified, you should be logged in.
+You may be prompted to verify the authenticity of the connection. Once verified, you should be logged in. Once
+you've become familiar with the server, exit the shell.
 
 Next, we need to connect to a worker node. You may recall that we set the IP address of worker-0 to 10.240.0.20.
 We'll use that information to "Jump" from the public machine to the other (non-public) machines.
@@ -31,11 +32,27 @@ To test Jump connectivity, use the following command:
 
 `ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" root@10.240.0.20`
 
-After verifying the authenticity of the connection, you should be logged into the worker-0 VSI.
+After verifying the authenticity of the connection, you should be logged into the worker-0 VSI. After verifying access,
+exit from the shell.
+
+**NOTE:** If you perform these steps after deleting and recreating the machines, you may get an error like the following:
+
+```
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that a host key has just been changed.
+```
+
+Generally, removing the old entry from `~/.ssh/known_hosts` will fix this situation.
 
 ## Certificate Authority
 
 In this section you will provision a Certificate Authority that can be used to generate additional TLS certificates.
+
+You may want to create a special directory to store all keys, (e.g. `mkdir keys`).
 
 Generate the CA configuration file, certificate, and private key:
 
@@ -327,8 +344,12 @@ Generate the Kubernetes API Server certificate and private key:
 
 ```
 {
-
-KUBERNETES_PUBLIC_ADDRESS=$FLOAT_IP1
+ALB_PRIVATE_IPS_ARR=($(ibmcloud is load-balancer $APP_LB1 --output JSON | jq -r '.private_ips[].address | @sh' | tr -d \'))
+ALB_PRIVATE_IPS=$(echo ${ALB_PRIVATE_IPS_ARR[@]} | tr ' ' ',')
+ALB_PUBLIC_IPS_ARR=($(ibmcloud is load-balancer $APP_LB1 --output JSON | jq -r '.public_ips[].address | @sh' | tr -d \'))
+ALB_PUBLIC_IPS=$(echo ${ALB_PUBLIC_IPS_ARR[@]} | tr ' ' ',')
+ALB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $APP_LB1 --output JSON | jq -r .hostname)
+ALL_ALB_NAMES=${ALB_PUBLIC_HOSTNAME},${ALB_PRIVATE_IPS},${ALB_PUBLIC_IPS}
 
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
@@ -355,7 +376,7 @@ cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=10.32.0.1,10.240.0.10,10.240.0.11,10.240.0.12,${KUBERNETES_PUBLIC_ADDRESS},127.0.0.1,${KUBERNETES_HOSTNAMES} \
+  -hostname=10.32.0.1,10.240.0.10,10.240.0.11,10.240.0.12,${ALL_ALB_NAMES},127.0.0.1,${KUBERNETES_HOSTNAMES} \
   -profile=kubernetes \
   kubernetes-csr.json | cfssljson -bare kubernetes
 
@@ -438,6 +459,9 @@ for instance in $CTRL_IPS; do
   scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem root@${instance}:~/
 done
 ```
+
+## Un-assign the floating IP address
+ TBD
 
 > The `kube-proxy`, `kube-controller-manager`, `kube-scheduler`, and `kubelet` client certificates will be used to generate client authentication configuration files in the next lab.
 

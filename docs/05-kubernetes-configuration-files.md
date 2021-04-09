@@ -12,11 +12,7 @@ Each kubeconfig requires a Kubernetes API Server to connect to. To support high 
 
 Retrieve the `kubernetes-the-hard-way` static IP address:
 
-```
-KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
-  --region $(gcloud config get-value compute/region) \
-  --format 'value(address)')
-```
+`KUBERNETES_PUBLIC_ADDRESS=${ALB_PUBLIC_HOSTNAME}`
 
 ### The kubelet Kubernetes Configuration File
 
@@ -191,23 +187,80 @@ admin.kubeconfig
 ```
 
 
-## 
+## All Files
+
+The complete set of files generated should look similar to the following:
+
+```
+admin-csr.json
+admin-key.pem
+admin.csr
+admin.kubeconfig
+admin.pem
+all.txt
+ca-config.json
+ca-csr.json
+ca-key.pem
+ca.csr
+ca.pem
+kube-controller-manager-csr.json
+kube-controller-manager-key.pem
+kube-controller-manager.csr
+kube-controller-manager.kubeconfig
+kube-controller-manager.pem
+kube-proxy-csr.json
+kube-proxy-key.pem
+kube-proxy.csr
+kube-proxy.kubeconfig
+kube-proxy.pem
+kube-scheduler-csr.json
+kube-scheduler-key.pem
+kube-scheduler.csr
+kube-scheduler.kubeconfig
+kube-scheduler.pem
+kubernetes-csr.json
+kubernetes-key.pem
+kubernetes.csr
+kubernetes.pem
+service-account-csr.json
+service-account-key.pem
+service-account.csr
+service-account.pem
+worker-0-csr.json
+worker-0-key.pem
+worker-0.csr
+worker-0.kubeconfig
+worker-0.pem
+worker-1-csr.json
+worker-1-key.pem
+worker-1.csr
+worker-1.kubeconfig
+worker-1.pem
+worker-2-csr.json
+worker-2-key.pem
+worker-2.csr
+worker-2.kubeconfig
+worker-2.pem
+
+```
 
 ## Distribute the Kubernetes Configuration Files
 
 Copy the appropriate `kubelet` and `kube-proxy` kubeconfig files to each worker instance:
 
 ```
-for instance in worker-0 worker-1 worker-2; do
-  gcloud compute scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~/
-done
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-0.kubeconfig kube-proxy.kubeconfig root@10.240.0.20:~/
+
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-2.kubeconfig kube-proxy.kubeconfig root@10.240.0.21:~/
+
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-2.kubeconfig kube-proxy.kubeconfig root@10.240.0.22:~/
 ```
 
 Copy the appropriate `kube-controller-manager` and `kube-scheduler` kubeconfig files to each controller instance:
 
 ```
-for instance in controller-0 controller-1 controller-2; do
-  gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~/
+for instance in $CTRL_IPS; do
+  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig root@${instance}:~/
 done
 ```
 

@@ -19,6 +19,8 @@ RT1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
 VPC_SUBNET_ID=$(ibmcloud is subnets --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
 SSH_KEY_ID=$(ibmcloud is keys --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
 IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
+FLOAT_IP1=$(ibmcloud is floating-ips --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
+APP_LB1=$(ibmcloud is load-balancers --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
 ```
 
 
@@ -48,7 +50,7 @@ Delete the external load balancer network resources:
 
 Release the floating IP address previously reserved:
 
-`ibmcloud is floating-ip-release $(ibmcloud is floating-ips --resource-group-id $RG_ID --output JSON | jq -r .[].id)`
+`ibmcloud is floating-ip-release $FLOAT_IP1`
 
 Delete the Subnet:
 
@@ -64,6 +66,21 @@ Delete the Resource Group:
 
 If this last operation fails, it generally means that some of the resources within the group have not been deleted.
 Ensure everything in the resource group has been deleted, and then repeat the command.
+
+## Finding lost Resources
+
+If you encounter an error deleting the resource group, it's possible that some resources were not deleted.
+The following commands will attempt to find any "dangling" resources associated with the resource group.
+
+```
+ibmcloud is floating-ips --resource-group-id $RG_ID
+ibmcloud is keys --resource-group-id $RG_ID
+ibmcloud is subnets --resource-group-id $RG_ID
+ibmcloud is vpcs --resource-group-id $RG_ID
+ibmcloud is security-groups --resource-group-id $RG_ID
+ibmcloud is network-acls --resource-group-id $RG_ID
+ibmcloud is instances --resource-group-id $RG_ID
+```
 
 ## Conclusion
 

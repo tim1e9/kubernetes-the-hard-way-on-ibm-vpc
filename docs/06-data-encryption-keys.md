@@ -8,9 +8,7 @@ In this lab you will generate an encryption key and an [encryption config](https
 
 Generate an encryption key:
 
-```
-ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
-```
+`ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)`
 
 ## The Encryption Config File
 
@@ -35,8 +33,8 @@ EOF
 Copy the `encryption-config.yaml` encryption config file to each controller instance:
 
 ```
-for instance in controller-0 controller-1 controller-2; do
-  gcloud compute scp encryption-config.yaml ${instance}:~/
+for instance in $CTRL_IPS; do
+  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" encryption-config.yaml root@${instance}:~/
 done
 ```
 
