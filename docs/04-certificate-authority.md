@@ -5,32 +5,24 @@ In this lab you will provision a [PKI Infrastructure](https://en.wikipedia.org/w
 ## Background - Connecting to Compute Resources
 
 Because we haven't provided public IP addresses for all of the servers, they won't be accessible over the internet.
-To get around this, we'll assign a public IP address to the `controller-0` instance, and then use it as a "jump machine"
-to access the rest of the resources in the subnet.
+To get around this, we've assigned a public IP address to the a special instance - the Bastion host. We'll use this
+host as a "jump machine" to access the rest of the resources in the subnet.
 
-Assign the previously created Floating IP address to the `controller-0` VSI:
+The IP address of the Bastion Host should be assigned to the environment variable `$BASTION_IP`.
 
-```
-PUB_IP_ADDR=$(ibmcloud is floating-ip $FLOAT_IP1 --output JSON | jq -r .address)
-VSI_CTRL_0=$(ibmcloud is instances --resource-group-id $RG_ID --output JSON | jq -r '.[] | select(.name=="controller-0") | .id')
-NIC1=$(ibmcloud is instance-network-interfaces $VSI_CTRL_0 --output JSON | jq -r .[].id)
-ibmcloud is instance-network-interface-floating-ip-add $VSI_CTRL_0 $NIC1 $FLOAT_IP1
-```
+To test the connection, use the following command:
 
-Now that the controller has a public IP address, it's possible to connect to it via SSH. To test the connection,
-use the following command:
-
-`ssh -i ~/.ssh/kubethw_id_rsa root@$PUB_IP_ADDR`
+`ssh -i ~/.ssh/kubethw_id_rsa root@$BASTION_IP`
 
 You may be prompted to verify the authenticity of the connection. Once verified, you should be logged in. Once
 you've become familiar with the server, exit the shell.
 
-Next, we need to connect to a worker node. You may recall that we set the IP address of worker-0 to 10.240.0.20.
+Next, we'll verify access to a worker node. You may recall that we set the IP address of worker-0 to 10.240.0.20.
 We'll use that information to "Jump" from the public machine to the other (non-public) machines.
 
 To test Jump connectivity, use the following command:
 
-`ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" root@10.240.0.20`
+`ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" root@10.240.0.20`
 
 After verifying the authenticity of the connection, you should be logged into the worker-0 VSI. After verifying access,
 exit from the shell.
@@ -389,15 +381,11 @@ The `kubernetes-the-hard-way` static IP address will be included in the list of 
 
 Generate the Kubernetes API Server certificate and private key:
 
+**NOTE:** In the previous step, the environment variable `$ALL_LB_NAMES` was defined. If this variable is missing,
+refer to the Supporting Material in step 3.
+
 ```
 {
-LB_PRIVATE_IPS_ARR=($(ibmcloud is load-balancer $LB1 --output JSON | jq -r '.private_ips[].address | @sh' | tr -d \'))
-LB_PRIVATE_IPS=$(echo ${LB_PRIVATE_IPS_ARR[@]} | tr ' ' ',')
-LB_PUBLIC_IPS_ARR=($(ibmcloud is load-balancer $LB1 --output JSON | jq -r '.public_ips[].address | @sh' | tr -d \'))
-LB_PUBLIC_IPS=$(echo ${LB_PUBLIC_IPS_ARR[@]} | tr ' ' ',')
-LB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $LB1 --output JSON | jq -r .hostname)
-ALL_LB_NAMES=${LB_PUBLIC_HOSTNAME},${LB_PRIVATE_IPS},${LB_PUBLIC_IPS}
-
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
 cat > kubernetes-csr.json <<EOF
@@ -504,9 +492,9 @@ service-account.csr (Not used)
 Copy the appropriate certificates and private keys to each worker instance:
 
 ```
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem worker-0-key.pem worker-0.pem root@10.240.0.20:~/
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem worker-1-key.pem worker-1.pem root@10.240.0.21:~/
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem worker-2-key.pem worker-2.pem root@10.240.0.22:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" ca.pem worker-0-key.pem worker-0.pem root@10.240.0.20:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" ca.pem worker-1-key.pem worker-1.pem root@10.240.0.21:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" ca.pem worker-2-key.pem worker-2.pem root@10.240.0.22:~/
 ```
 
 Copy the appropriate certificates and private keys to each controller instance:
@@ -517,12 +505,9 @@ Gather a list of all controller nodes:
 ```
 
 for instance in $CTRL_IPS; do
-  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem root@${instance}:~/
+  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem service-account-key.pem service-account.pem root@${instance}:~/
 done
 ```
-
-## Un-assign the floating IP address
- TBD
 
 > The `kube-proxy`, `kube-controller-manager`, `kube-scheduler`, and `kubelet` client certificates will be used to generate client authentication configuration files in the next lab.
 

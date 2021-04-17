@@ -7,21 +7,8 @@ However, to ensure accidental deletions are minimized, the flag is not used in t
 
 ## Environment Variables
 
-If you accidentally exited the terminal, it may be painful to re-assign all variables. The following
-commands will re-assign the variables required to clean up all resources.
-
-```
-RG_ID=$(ibmcloud resource group kube-thw-ibmvpc-rg --output JSON | jq -r .[0].id)
-VPC_ID=$(ibmcloud is vpcs --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
-SG1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_security_group.id)
-NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_network_acl.id)
-RT1=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
-VPC_SUBNET_ID=$(ibmcloud is subnets --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
-SSH_KEY_ID=$(ibmcloud is keys --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
-IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
-FLOAT_IP1=$(ibmcloud is floating-ips --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
-LB1=$(ibmcloud is load-balancers --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
-```
+If you accidentally exited the terminal, it may be painful to re-assign all variables. Fortunately,
+there's a way to recreate all of them. [See - Refreshing Environment Variables](./03-compute-resources.md)
 
 
 ## Compute Instances
@@ -46,11 +33,11 @@ Delete the SSH key which was previously created
 
 Delete the external load balancer network resources:
 
------ TBD ------
+`ibmcloud is load-balancer-delete $NLB_ID`
 
 Release the floating IP address previously reserved:
 
-`ibmcloud is floating-ip-release $FLOAT_IP1`
+`ibmcloud is floating-ip-release $FIP_ID`
 
 Delete the Subnet:
 

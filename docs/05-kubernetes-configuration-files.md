@@ -10,9 +10,10 @@ In this section you will generate kubeconfig files for the `controller manager`,
 
 Each kubeconfig requires a Kubernetes API Server to connect to. To support high availability the IP address assigned to the external load balancer fronting the Kubernetes API Servers will be used.
 
-Retrieve the `kubernetes-the-hard-way` static IP address:
+This address has previously been saved in an environment variable named `$LB_PUBLIC_IP`. However, for consistency with the rest
+of this guide, we'll assign the same value to a new variable:
 
-`KUBERNETES_PUBLIC_ADDRESS=${LB_PUBLIC_IPS}`
+`KUBERNETES_PUBLIC_ADDRESS=${LB_PUBLIC_IP}`
 
 ### The kubelet Kubernetes Configuration File
 
@@ -249,18 +250,18 @@ worker-2.pem
 Copy the appropriate `kubelet` and `kube-proxy` kubeconfig files to each worker instance:
 
 ```
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-0.kubeconfig kube-proxy.kubeconfig root@10.240.0.20:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" worker-0.kubeconfig kube-proxy.kubeconfig root@10.240.0.20:~/
 
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-1.kubeconfig kube-proxy.kubeconfig root@10.240.0.21:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" worker-1.kubeconfig kube-proxy.kubeconfig root@10.240.0.21:~/
 
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-2.kubeconfig kube-proxy.kubeconfig root@10.240.0.22:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" worker-2.kubeconfig kube-proxy.kubeconfig root@10.240.0.22:~/
 ```
 
 Copy the appropriate `kube-controller-manager` and `kube-scheduler` kubeconfig files to each controller instance:
 
 ```
 for instance in $CTRL_IPS; do
-  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig root@${instance}:~/
+  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig root@${instance}:~/
 done
 ```
 

@@ -6,20 +6,30 @@ In this lab you will create a route for each worker node that maps the node's Po
 
 > There are [other ways](https://kubernetes.io/docs/concepts/cluster-administration/networking/#how-to-achieve-this) to implement the Kubernetes networking model.
 
+## Hostname Resolution
+
+In some VPCs, there are services to automatically resolve hostnames on a subnet. To manually apply these updates, update
+the file named `/etc/hosts` on each of the three controllers and the three workers. The extra lines to add are as follows:\
+
+IP ADDRESSES
+------------
+10.240.0.10 controller-0
+10.240.0.11 controller-1
+10.240.0.12 controller-2
+10.240.0.20 worker-0
+10.240.0.21 worker-1
+10.240.0.22 worker-2
+
+**NOTE:** You should remove the entry associated with the current compute instance. So for example, when updating the
+`hosts` file for worker-0, remove the following line from the above list: `10.240.0.20 worker-0`
+
+After making the changes, you should be able to 'ping' each machine from the other machines using the short name / hostname.
+
 ## The Routing Table
 
 In this section you will gather the information required to create routes in the `kubernetes-the-hard-way` VPC network.
 
-Print the internal IP address and Pod CIDR range for each worker instance:
-
-```
-for instance in worker-0 worker-1 worker-2; do
-  gcloud compute instances describe ${instance} \
-    --format 'value[separator=" "](networkInterfaces[0].networkIP,metadata.items[0].value)'
-done
-```
-
-> output
+Recall IP address and Pod CIDR range for each worker instance:
 
 ```
 10.240.0.20 10.200.0.0/24
@@ -32,29 +42,19 @@ done
 Create network routes for each worker instance:
 
 ```
-for i in 0 1 2; do
-  gcloud compute routes create kubernetes-route-10-200-${i}-0-24 \
-    --network kubernetes-the-hard-way \
-    --next-hop-address 10.240.0.2${i} \
-    --destination-range 10.200.${i}.0/24
-done
+ibmcloud is vpc-routing-table-route-create $VPC_ID $RT_ID -zone us-south-1 --destination 10.200.0.0/24 --next-hop 10.240.0.20
+ibmcloud is vpc-routing-table-route-create $VPC_ID $RT_ID -zone us-south-1 --destination 10.200.1.0/24 --next-hop 10.240.0.21
+ibmcloud is vpc-routing-table-route-create $VPC_ID $RT_ID -zone us-south-1 --destination 10.200.2.0/24 --next-hop 10.240.0.22
 ```
 
 List the routes in the `kubernetes-the-hard-way` VPC network:
 
 ```
-gcloud compute routes list --filter "network: kubernetes-the-hard-way"
+ibmcloud is vpc-routing-table-routes $VPC_ID $RT_ID
 ```
 
 > output
 
-```
-NAME                            NETWORK                  DEST_RANGE     NEXT_HOP                  PRIORITY
-default-route-6be823b741087623  kubernetes-the-hard-way  0.0.0.0/0      default-internet-gateway  1000
-default-route-cebc434ce276fafa  kubernetes-the-hard-way  10.240.0.0/24  kubernetes-the-hard-way   0
-kubernetes-route-10-200-0-0-24  kubernetes-the-hard-way  10.200.0.0/24  10.240.0.20               1000
-kubernetes-route-10-200-1-0-24  kubernetes-the-hard-way  10.200.1.0/24  10.240.0.21               1000
-kubernetes-route-10-200-2-0-24  kubernetes-the-hard-way  10.200.2.0/24  10.240.0.22               1000
-```
+All three custom routes should be displayed.
 
 Next: [Deploying the DNS Cluster Add-on](12-dns-addon.md)

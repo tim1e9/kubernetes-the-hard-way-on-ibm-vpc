@@ -34,7 +34,7 @@ Copy the `encryption-config.yaml` encryption config file to each controller inst
 
 ```
 for instance in $CTRL_IPS; do
-  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" encryption-config.yaml root@${instance}:~/
+  scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" encryption-config.yaml root@${instance}:~/
 done
 ```
 

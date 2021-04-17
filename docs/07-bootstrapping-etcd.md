@@ -6,7 +6,7 @@ Kubernetes components are stateless and store cluster state in [etcd](https://gi
 
 The commands in this lab must be run on each controller instance: `controller-0` (`10.240.0.10`) , `controller-1` (`10.240.0.11`), and `controller-2` (`10.240.0.12`). Login to each controller instance using the `ssh` command. Example:
 
-`ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" root@10.240.0.10`
+`ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$BASTION_IP" root@10.240.0.10`
 
 ### Running commands in parallel with tmux
 
