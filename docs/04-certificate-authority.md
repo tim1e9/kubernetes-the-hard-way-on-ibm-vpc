@@ -99,11 +99,19 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 }
 ```
 
-Results:
+Config files created:
+
+```
+ca-config.json  (Used for future commands)
+ca-csr.json
+```
+
+Files generated:
 
 ```
 ca-key.pem
 ca.pem
+ca.csr (not needed)
 ```
 
 ## Client and Server Certificates
@@ -146,11 +154,18 @@ cfssl gencert \
 }
 ```
 
-Results:
+Config files created:
+
+```
+admin-csr.json
+```
+
+Files generated:
 
 ```
 admin-key.pem
 admin.pem
+admin.csr (Not used)
 ```
 
 ### The Kubelet Client Certificates
@@ -194,7 +209,15 @@ cfssl gencert \
 done
 ```
 
-Results:
+Config files created:
+
+```
+worker-0-csr.json
+worker-1-csr.json
+worker-2-csr.json
+```
+
+Files generated:
 
 ```
 worker-0-key.pem
@@ -203,6 +226,9 @@ worker-1-key.pem
 worker-1.pem
 worker-2-key.pem
 worker-2.pem
+worker-0.csr (Not used)
+worker-1.csr (Not used)
+worker-1.csr (Not used)
 ```
 
 ### The Controller Manager Client Certificate
@@ -241,11 +267,18 @@ cfssl gencert \
 }
 ```
 
-Results:
+Config files created:
+
+```
+kube-controller-manager-csr.json
+```
+
+Files generated:
 
 ```
 kube-controller-manager-key.pem
 kube-controller-manager.pem
+kube-controller-manager.csr (Not used)
 ```
 
 
@@ -285,11 +318,18 @@ cfssl gencert \
 }
 ```
 
-Results:
+Config files created:
+
+```
+kube-proxy-csr.json
+```
+
+Files generated:
 
 ```
 kube-proxy-key.pem
 kube-proxy.pem
+kube-proxy.csr (Not used)
 ```
 
 ### The Scheduler Client Certificate
@@ -328,11 +368,18 @@ cfssl gencert \
 }
 ```
 
-Results:
+Config files created:
+
+```
+kube-scheduler-csr.json
+```
+
+Files generated:
 
 ```
 kube-scheduler-key.pem
 kube-scheduler.pem
+kube-scheduler.csr (Not used)
 ```
 
 
@@ -344,12 +391,12 @@ Generate the Kubernetes API Server certificate and private key:
 
 ```
 {
-ALB_PRIVATE_IPS_ARR=($(ibmcloud is load-balancer $APP_LB1 --output JSON | jq -r '.private_ips[].address | @sh' | tr -d \'))
-ALB_PRIVATE_IPS=$(echo ${ALB_PRIVATE_IPS_ARR[@]} | tr ' ' ',')
-ALB_PUBLIC_IPS_ARR=($(ibmcloud is load-balancer $APP_LB1 --output JSON | jq -r '.public_ips[].address | @sh' | tr -d \'))
-ALB_PUBLIC_IPS=$(echo ${ALB_PUBLIC_IPS_ARR[@]} | tr ' ' ',')
-ALB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $APP_LB1 --output JSON | jq -r .hostname)
-ALL_ALB_NAMES=${ALB_PUBLIC_HOSTNAME},${ALB_PRIVATE_IPS},${ALB_PUBLIC_IPS}
+LB_PRIVATE_IPS_ARR=($(ibmcloud is load-balancer $LB1 --output JSON | jq -r '.private_ips[].address | @sh' | tr -d \'))
+LB_PRIVATE_IPS=$(echo ${LB_PRIVATE_IPS_ARR[@]} | tr ' ' ',')
+LB_PUBLIC_IPS_ARR=($(ibmcloud is load-balancer $LB1 --output JSON | jq -r '.public_ips[].address | @sh' | tr -d \'))
+LB_PUBLIC_IPS=$(echo ${LB_PUBLIC_IPS_ARR[@]} | tr ' ' ',')
+LB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $LB1 --output JSON | jq -r .hostname)
+ALL_LB_NAMES=${LB_PUBLIC_HOSTNAME},${LB_PRIVATE_IPS},${LB_PUBLIC_IPS}
 
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
@@ -376,7 +423,7 @@ cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
-  -hostname=10.32.0.1,10.240.0.10,10.240.0.11,10.240.0.12,${ALL_ALB_NAMES},127.0.0.1,${KUBERNETES_HOSTNAMES} \
+  -hostname=10.32.0.1,10.240.0.10,10.240.0.11,10.240.0.12,${ALL_LB_NAMES},127.0.0.1,${KUBERNETES_HOSTNAMES} \
   -profile=kubernetes \
   kubernetes-csr.json | cfssljson -bare kubernetes
 
@@ -385,11 +432,18 @@ cfssl gencert \
 
 > The Kubernetes API server is automatically assigned the `kubernetes` internal dns name, which will be linked to the first IP address (`10.32.0.1`) from the address range (`10.32.0.0/24`) reserved for internal cluster services during the [control plane bootstrapping](08-bootstrapping-kubernetes-controllers.md#configure-the-kubernetes-api-server) lab.
 
-Results:
+Config files created:
+
+```
+kubernetes-csr.json
+```
+
+Files generated:
 
 ```
 kubernetes-key.pem
 kubernetes.pem
+kubernetes.csr (Not used)
 ```
 
 ## The Service Account Key Pair
@@ -430,11 +484,18 @@ cfssl gencert \
 }
 ```
 
-Results:
+Config files created:
+
+```
+service-account-csr.json
+```
+
+Files generated:
 
 ```
 service-account-key.pem
 service-account.pem
+service-account.csr (Not used)
 ```
 
 ## Distribute the Client and Server Certificates

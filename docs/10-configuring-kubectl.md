@@ -10,12 +10,11 @@ Each kubeconfig requires a Kubernetes API Server to connect to. To support high 
 
 Generate a kubeconfig file suitable for authenticating as the `admin` user:
 
+**NOTE:** The environment variable `KUBERNETES_PUBLIC_ADDRESS` should have already been defined. If it's not
+defined, then set it equal to the IP address of the load balancer.
+
 ```
 {
-  KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
-    --region $(gcloud config get-value compute/region) \
-    --format 'value(address)')
-
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
     --embed-certs=true \

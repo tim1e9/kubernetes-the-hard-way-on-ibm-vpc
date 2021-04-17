@@ -214,6 +214,8 @@ sudo apt-get update
 sudo apt-get install -y nginx
 ```
 
+CHANGE THE DEFAULT SITE TO SUPPORT THE HEALTHZ ENDPOINT TOO  (TODO)
+
 ```
 cat > kubernetes.default.svc.cluster.local <<EOF
 server {

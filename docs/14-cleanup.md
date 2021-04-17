@@ -20,7 +20,7 @@ VPC_SUBNET_ID=$(ibmcloud is subnets --resource-group-id $RG_ID --output JSON | j
 SSH_KEY_ID=$(ibmcloud is keys --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
 IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
 FLOAT_IP1=$(ibmcloud is floating-ips --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
-APP_LB1=$(ibmcloud is load-balancers --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
+LB1=$(ibmcloud is load-balancers --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
 ```
 
 

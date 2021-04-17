@@ -4,10 +4,10 @@ In this lab you will bootstrap three Kubernetes worker nodes. The following comp
 
 ## Prerequisites
 
-The commands in this lab must be run on each worker instance: `worker-0`, `worker-1`, and `worker-2`. Login to each worker instance using the `gcloud` command. Example:
+The commands in this lab must be run on each worker instance: `worker-0`, `worker-1`, and `worker-2`. Login to each worker instance using `ssh`. Example:
 
 ```
-gcloud compute ssh worker-0
+ssh -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" root@10.240.0.20
 ```
 
 ### Running commands in parallel with tmux
@@ -87,11 +87,12 @@ Install the worker binaries:
 
 ### Configure CNI Networking
 
-Retrieve the Pod CIDR range for the current compute instance:
+Set the Pod CIDR range for the current compute instances (Each in a different window):
 
 ```
-POD_CIDR=$(curl -s -H "Metadata-Flavor: Google" \
-  http://metadata.google.internal/computeMetadata/v1/instance/attributes/pod-cidr)
+POD_CIDR=10.200.0.0/24
+POD_CIDR=10.200.1.0/24
+POD_CIDR=10.200.2.0/24
 ```
 
 Create the `bridge` network configuration file:
@@ -309,5 +310,7 @@ worker-0   Ready    <none>   24s   v1.18.6
 worker-1   Ready    <none>   24s   v1.18.6
 worker-2   Ready    <none>   24s   v1.18.6
 ```
+
+**Note:** If the list of nodes comes back as empty, it may be necessary to reboot the machines.
 
 Next: [Configuring kubectl for Remote Access](10-configuring-kubectl.md)

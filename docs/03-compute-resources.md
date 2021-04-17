@@ -19,7 +19,7 @@ For this tutorial, we'll use a single resource group for all of our resources.
 
 To create a resource group:
 
-`RG_ID=$(ibmcloud resource group-create kube-thw-ibmvpc-rg --output JSON | jq -r .id)`
+`RG_ID=$(ibmcloud resource group-create kube-thw-ibmvpc-rg --output JSON | jq -r ".id")`
 
 Or, if you prefer to not store the ID in an environment variable:
 
@@ -69,6 +69,7 @@ Once the silly names have been replaced, it's necessary to add a rule to the sec
 ```
 ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 22 --port-max 22
 ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 443 --port-max 443
+ibmcloud is security-group-rule-add $SG1 inbound tcp --port-min 80 --port-max 80
 ibmcloud is security-group-rule-add $SG1 inbound icmp --icmp-type 8
 ```
 After these updates, the names may be simpler to understand.
@@ -128,7 +129,11 @@ ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
   --name https1 --source-port-min 443 --source-port-max 443 --destination-port-min 1 --destination-port-max 65535
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name https2 --source-port-min 1 --source-port-max 65535 --destination-port-min 443 --destination-port-max 443
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
   --name http1 --source-port-min 80 --source-port-max 80 --destination-port-min 1 --destination-port-max 65535
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name http2 --source-port-min 1 --source-port-max 65535 --destination-port-min 80 --destination-port-max 80
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
   --name ssh1 --source-port-min 1 --source-port-max 65535 --destination-port-min 22 --destination-port-max 22
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound icmp 0.0.0.0/0 0.0.0.0/0 \
@@ -248,7 +253,7 @@ and overall name.
 
 To create the load balancer:
 
-`APP_LB1=$(ibmcloud is load-balancer-create kube-thw-app-balancer public --subnet $VPC_SUBNET_ID --family application --security-group $SG1 --resource-group-id $RG_ID --output JSON | jq -r .id)`
+`LB1=$(ibmcloud is load-balancer-create kube-thw-netwk-balancer public --subnet $VPC_SUBNET_ID --family network --security-group $SG1 --resource-group-id $RG_ID --output JSON | jq -r .id)`
 
 
 ## Verify Access to Compute Instances
@@ -265,11 +270,7 @@ Test SSH access to the `controller-0` compute instances:
 
     (Make a note of the NIC ID)
 
-    `ibmcloud is floating-ips --resource-group-id $RG_ID`
-
-    (Make a note of the Floating IP ID)
-
-    `ibmcloud is instance-network-interface-floating-ip-add [instance ID] [NIC ID] [Floating IP ID]`
+    `ibmcloud is instance-network-interface-floating-ip-add [instance ID] [NIC ID] $FLOAT_IP1`
 
 2. Using the previously-created public/private key, SSH to the instance 
     
@@ -327,7 +328,11 @@ ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
   --name https1 --source-port-min 443 --source-port-max 443 --destination-port-min 1 --destination-port-max 65535
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name https2 --source-port-min 1 --source-port-max 65535 --destination-port-min 443 --destination-port-max 443
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
   --name http1 --source-port-min 80 --source-port-max 80 --destination-port-min 1 --destination-port-max 65535
+ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
+  --name http2 --source-port-min 1 --source-port-max 65535 --destination-port-min 80 --destination-port-max 80
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound tcp 0.0.0.0/0 0.0.0.0/0 \
   --name ssh1 --source-port-min 1 --source-port-max 65535 --destination-port-min 22 --destination-port-max 22
 ibmcloud is network-acl-rule-add $NACL_ID allow inbound icmp 0.0.0.0/0 0.0.0.0/0 \
@@ -337,7 +342,7 @@ FLOAT_IP1=$(ibmcloud is floating-ip-reserve kube-thw-fip1 --zone us-south-1 --re
 SSH_KEY_ID=$(ibmcloud is key-create kube-thw-ssh-key @~/.ssh/kubethw_id_rsa.pub --resource-group-id $RG_ID --output JSON | jq -r .id)
 IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
 
-APP_LB1=$(ibmcloud is load-balancer-create kube-thw-app-balancer public --subnet $VPC_SUBNET_ID --family application --security-group $SG1 --resource-group-id $RG_ID --output JSON | jq -r .id)
+LB1=$(ibmcloud is load-balancer-create kube-thw-netwk-balancer public --subnet $VPC_SUBNET_ID --family network --security-group $SG1 --resource-group-id $RG_ID --output JSON | jq -r .id)
 
 for i in 0 1 2; do
   ibmcloud is instance-create controller-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
@@ -361,7 +366,7 @@ echo Routing Table ID: $RT1
 echo VPC Subnet ID: $VPC_SUBNET_ID
 echo Floating IP Address ID: $FLOAT_IP1
 echo SSH Key ID: $SSH_KEY_ID
-echo Application Load Balancer ID: $APP_LB1
+echo Application Load Balancer ID: $LB1
 ```
 
 

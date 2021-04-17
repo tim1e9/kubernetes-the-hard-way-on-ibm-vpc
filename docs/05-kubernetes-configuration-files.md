@@ -12,7 +12,7 @@ Each kubeconfig requires a Kubernetes API Server to connect to. To support high 
 
 Retrieve the `kubernetes-the-hard-way` static IP address:
 
-`KUBERNETES_PUBLIC_ADDRESS=${ALB_PUBLIC_HOSTNAME}`
+`KUBERNETES_PUBLIC_ADDRESS=${LB_PUBLIC_IPS}`
 
 ### The kubelet Kubernetes Configuration File
 
@@ -251,7 +251,7 @@ Copy the appropriate `kubelet` and `kube-proxy` kubeconfig files to each worker 
 ```
 scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-0.kubeconfig kube-proxy.kubeconfig root@10.240.0.20:~/
 
-scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-2.kubeconfig kube-proxy.kubeconfig root@10.240.0.21:~/
+scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-1.kubeconfig kube-proxy.kubeconfig root@10.240.0.21:~/
 
 scp -i ~/.ssh/kubethw_id_rsa -o ProxyCommand="ssh -i ~/.ssh/kubethw_id_rsa -W %h:%p root@$PUB_IP_ADDR" worker-2.kubeconfig kube-proxy.kubeconfig root@10.240.0.22:~/
 ```
