@@ -21,6 +21,8 @@ VPC_INSTANCES=($(ibmcloud is instances --resource-group-id $RG_ID --output JSON 
 for i in "${VPC_INSTANCES[@]}"; do
   ibmcloud is instance-delete $i
 done
+
+ibmcloud is instance-delete $BASTION_ID
 ```
 
 ## SSH Key
@@ -42,6 +44,10 @@ Release the floating IP address previously reserved:
 Delete the Subnet:
 
 `ibmcloud is subnet-delete $VPC_SUBNET_ID`
+
+Delete the Public Gateway:
+
+`ibmcloud is public-gateway-delete $PG_ID`
 
 Delete the `kubernetes-the-hard-way` VPC:
 
