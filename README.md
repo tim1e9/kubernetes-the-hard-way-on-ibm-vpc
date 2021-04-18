@@ -7,8 +7,8 @@ Cloud (VPC) equivalent. I strongly recommend you read and star
 
 
 There are several automated ways to install and configure Kubernetes. Unfortunately, I believe
-that they short-change your overall understanding of the platform. So from a learning perspective,
-it's important to grasp what automation is doing for you. Besides, rolling up our colective sleeves
+that they short-change your overall understanding of the platform. So, from a learning perspective,
+it's important to grasp what automation is doing for you. Besides, rolling up our collective sleeves
 and getting something working from scratch is fun. (Well, for many of us it is.)
 
 Kubernetes The Hard Way is optimized for learning, which means taking the long route to ensure you understand each task required to bootstrap a Kubernetes cluster.

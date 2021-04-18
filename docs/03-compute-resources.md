@@ -7,7 +7,7 @@ Kubernetes requires a set of machines to host the Kubernetes control plane and t
 ## Unique Identifiers
 
 A number of resources must be referenced by their unique identifier. This is not the same as the name of the resource.
-In an effort to make this simpler to manage, environmefnt variables will be used. 
+In an effort to make this simpler to manage, environment variables will be used. 
 
 ## Resource Groups
 

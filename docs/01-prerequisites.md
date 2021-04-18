@@ -4,7 +4,9 @@
 
 This tutorial leverages the [IBM Cloud Platform](https://cloud.ibm.com/) to streamline provisioning of the compute infrastructure required to bootstrap a Kubernetes cluster from the ground up. [Sign up](https://cloud.ibm.com/registration) to get an account.
 
-Estimated costs - TBD
+There are costs associated with this tutorial. However, the costs can potentially be mitigated by reviewing
+any special promotions or offers available. As of this writing, there's a $500 promotion which should more than
+cover the costs. Additional information can be found [On the IBM Cloud VPC Pricing site](https://www.ibm.com/cloud/vpc/pricing).
 
 
 ## IBM Cloud Command Line Interface (CLI)
