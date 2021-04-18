@@ -2,12 +2,30 @@
 
 In this lab you will install the command line utilities required to complete this tutorial: [cfssl](https://github.com/cloudflare/cfssl), [cfssljson](https://github.com/cloudflare/cfssl), and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl).
 
+**Note:** This tutorial has been tested on MacOS as well as Windows 10 with the Windows Subsystem for Linux (WSL). To keep
+installation procedures clear, it's assumed that the Linux and Win10/WSL steps will be the same.
 
 ## Install CFSSL
 
 The `cfssl` and `cfssljson` command line utilities will be used to provision a [PKI Infrastructure](https://en.wikipedia.org/wiki/Public_key_infrastructure) and generate TLS certificates.
 
 Download and install `cfssl` and `cfssljson`:
+
+### Linux
+
+```
+wget -q --show-progress --https-only --timestamping \
+  https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssl \
+  https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssljson
+```
+
+```
+chmod +x cfssl cfssljson
+```
+
+```
+sudo mv cfssl cfssljson /usr/local/bin/
+```
 
 ### OS X
 
@@ -28,22 +46,6 @@ Some OS X users may experience problems using the pre-built binaries in which ca
 
 ```
 brew install cfssl
-```
-
-### Linux
-
-```
-wget -q --show-progress --https-only --timestamping \
-  https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssl \
-  https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssljson
-```
-
-```
-chmod +x cfssl cfssljson
-```
-
-```
-sudo mv cfssl cfssljson /usr/local/bin/
 ```
 
 ### Verification
@@ -73,10 +75,10 @@ Runtime: go1.12.12
 
 The `kubectl` command line utility is used to interact with the Kubernetes API Server. Download and install `kubectl` from the official release binaries:
 
-### OS X
+### Linux
 
 ```
-curl -o kubectl https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/darwin/amd64/kubectl
+wget https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl
 ```
 
 ```
@@ -87,10 +89,10 @@ chmod +x kubectl
 sudo mv kubectl /usr/local/bin/
 ```
 
-### Linux
+### OS X
 
 ```
-wget https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl
+curl -o kubectl https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/darwin/amd64/kubectl
 ```
 
 ```
@@ -120,6 +122,10 @@ Client Version: version.Info{Major:"1", Minor:"18", GitVersion:"v1.18.6", GitCom
 ### Linux
 
 `jq` should be installed by default on most recent Linux distributions
+
+### MacOS
+
+`brew install jq`
 
 ### Verification
 

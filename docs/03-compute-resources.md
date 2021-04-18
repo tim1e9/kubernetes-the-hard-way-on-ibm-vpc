@@ -66,13 +66,22 @@ ibmcloud is vpc-routing-table-update $VPC_ID $RT_ID --name kube-thw-ibmvpc-rt
 
 After these updates, the names may be simpler to understand.
 
+Also, it's necessary to expose some ports for access:
+
+```
+ibmcloud is security-group-rule-add $SG_ID inbound tcp --port-min 22 --port-max 22
+ibmcloud is security-group-rule-add $SG_ID inbound tcp --port-min 6443 --port-max 6443
+ibmcloud is security-group-rule-add $SG_ID inbound tcp --port-min 80 --port-max 80
+ibmcloud is security-group-rule-add $SG_ID inbound icmp --icmp-type 8
+```
+
 ### PUBLIC GATEWAY
 
 Create a public gateway so that VSIs in the cluster can reach the public internet:
 
 `PG_ID=$(ibmcloud is public-gateway-create kube-thw-ibmvpc-pg $VPC_ID us-south-1 --resource-group-id $RG_ID --output JSON | jq -r ".id")`
 
-#### Create a Subnet
+### Create a Subnet
 
 A subnet must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
 
@@ -85,7 +94,7 @@ To view all subnets within the previously created resource group, type:
 `ibmcloud is subnets --resource-group-id $RG_ID`
 
 
-> An [external load balancer](https://www.ibm.com/) will be used to expose the Kubernetes API Servers to remote clients.
+> An [external load balancer](https://cloud.ibm.com/docs/vpc?topic=vpc-network-load-balancers) will be used to expose the Kubernetes API Servers to remote clients.
 
 
 
@@ -126,7 +135,7 @@ Your public key has been saved in /home/someuser/.ssh/kubethw_id_rsa.pub
 
 ### Import the key into the VPC
 
-`SSH_KEY_ID=$(ibmcloud is key-create kube-thw-ibmvpc-ssh-key @~/.ssh/kubethw_id_rsa.pub --resource-group-id $RG_ID --output JSON | jq -r ".id")`
+`SSH_KEY_ID=$(ibmcloud is key-create kube-thw-ibmvpc-ssh-key '@~/.ssh/kubethw_id_rsa.pub' --resource-group-id $RG_ID --output JSON | jq -r ".id")`
 
 ## Compute Instances (Virtual Server Instances)
 
@@ -159,6 +168,7 @@ Create three compute instances which will host the Kubernetes control plane:
 for i in 0 1 2; do
   ibmcloud is instance-create controller-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID --image-id $IMAGE_ID \
   --key-ids $SSH_KEY_ID --security-group-ids $SG_ID --resource-group-id $RG_ID --ipv4 10.240.0.1${i}
+  declare "CTRLR${i}_ID=${INST_ID}"
 done
 ```
 
@@ -174,7 +184,7 @@ Create three compute instances which will host the Kubernetes worker nodes:
 
 ```
 for i in 0 1 2; do
-  ibmcloud is instance-create worker-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID
+  ibmcloud is instance-create worker-${i} $VPC_ID us-south-1 bx2-2x8 $VPC_SUBNET_ID \
     --image-id $IMAGE_ID --allow-ip-spoofing true --key-ids $SSH_KEY_ID \
     --security-group-ids $SG_ID --resource-group-id $RG_ID --ipv4 10.240.0.2${i}
 done
@@ -191,7 +201,7 @@ To make the Bastion host available, it's necessary to assign the floating IP add
 Note: We previously defined the ID of the Bastion host to the variable `BASTION_ID`
 
 ```
-BN_NIC_ID=$(ibmcloud is instance $BASTION_ID | jq -r ".primary_network_interface.id")
+BN_NIC_ID=$(ibmcloud is instance $BASTION_ID --output JSON | jq -r ".primary_network_interface.id")
 ibmcloud is instance-network-interface-floating-ip-add $BASTION_ID $BN_NIC_ID $FIP_ID
 ```
 
@@ -209,7 +219,13 @@ and hostname.
 
 To create the network load balancer:
 
-`NLB_ID=$(ibmcloud is load-balancer-create kube-thw-ibmvpc-nlb public --subnet $VPC_SUBNET_ID --family network --security-group $SG_ID --resource-group-id $RG_ID --output JSON | jq -r ".id")`
+`NLB_ID=$(ibmcloud is load-balancer-create kube-thw-ibmvpc-nlb public --subnet $VPC_SUBNET_ID --family network --resource-group-id $RG_ID --output JSON | jq -r ".id")`
+
+**NOTE:** It may take some time to provision the load balancer. It's therefore necessary to make sure provisioning has
+completed before proceeding. This can be verified by the following command:
+`ibmcloud is load-balancer $NLB_ID`
+
+If the provision status is `create_pending`, then you should wait until it changes to `active`.
 
 To gather the private IPs, public IP, and hostname of the load balancer, use the following:
 
@@ -218,8 +234,9 @@ LB_PRIVATE_IPS_ARR=($(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r '.
 LB_PRIVATE_IPS=$(echo ${LB_PRIVATE_IPS_ARR[@]} | tr ' ' ',')
 LB_PUBLIC_IPS_ARR=($(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r '.public_ips[].address | @sh' | tr -d \'))
 LB_PUBLIC_IP=$(echo ${LB_PUBLIC_IPS_ARR[@]} | tr ' ' ',')
-LB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r .hostname)
+LB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r ".hostname")
 ALL_LB_NAMES=${LB_PUBLIC_HOSTNAME},${LB_PRIVATE_IPS},${LB_PUBLIC_IP}
+KUBERNETES_PUBLIC_ADDRESS=$LB_PUBLIC_IP
 ```
 
 ## Verify Access to Compute Instances
@@ -259,6 +276,8 @@ RT_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r ".default_routing_table.id
 ibmcloud is vpc-routing-table-update $VPC_ID $RT_ID --name kube-thw-ibmvpc-rt
 
 ibmcloud is security-group-rule-add $SG_ID inbound tcp --port-min 22 --port-max 22
+ibmcloud is security-group-rule-add $SG_ID inbound tcp --port-min 6443 --port-max 6443
+ibmcloud is security-group-rule-add $SG_ID inbound tcp --port-min 80 --port-max 80
 ibmcloud is security-group-rule-add $SG_ID inbound icmp --icmp-type 8
 
 PG_ID=$(ibmcloud is public-gateway-create kube-thw-ibmvpc-pg $VPC_ID us-south-1 --resource-group-id $RG_ID --output JSON | jq -r ".id")
@@ -300,14 +319,14 @@ NLB_ID=$(ibmcloud is load-balancer-create kube-thw-ibmvpc-nlb public --subnet $V
 If you accidentally exit a terminal, it may be painful to re-assign all variables. The following should help:
 
 ```
-RG_ID=$(ibmcloud resource group kube-thw-ibmvpc-rg --output JSON | jq -r .[0].id)
-VPC_ID=$(ibmcloud is vpcs --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
-SG_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_security_group.id)
-NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_network_acl.id)
-RT_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r .default_routing_table.id)
+RG_ID=$(ibmcloud resource group kube-thw-ibmvpc-rg --output JSON | jq -r ".[0].id")
+VPC_ID=$(ibmcloud is vpcs --resource-group-id $RG_ID --output JSON | jq -r ".[0].id") 
+SG_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r ".default_security_group.id")
+NACL_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r ".default_network_acl.id")
+RT_ID=$(ibmcloud is vpc $VPC_ID --output JSON | jq -r ".default_routing_table.id")
 PG_ID=$(ibmcloud is public-gateways --resource-group-id $RG_ID --output JSON | jq -r ".[0].id")
-VPC_SUBNET_ID=$(ibmcloud is subnets --resource-group-id $RG_ID --output JSON | jq -r .[0].id) 
-SSH_KEY_ID=$(ibmcloud is keys --resource-group-id $RG_ID --output JSON | jq -r .[0].id)
+VPC_SUBNET_ID=$(ibmcloud is subnets --resource-group-id $RG_ID --output JSON | jq -r ".[0].id") 
+SSH_KEY_ID=$(ibmcloud is keys --resource-group-id $RG_ID --output JSON | jq -r ".[0].id")
 FIP_ID=$(ibmcloud is floating-ips --resource-group-id $RG_ID --output JSON | jq -r ".[0].id")
 IMAGE_ID=$(ibmcloud is images --output JSON | jq -r '.[] | select(.operating_system.name=="ubuntu-20-04-amd64") | .id')
 NLB_ID=$(ibmcloud is load-balancers --resource-group-id $RG_ID --output JSON | jq -r ".[0].id")
@@ -315,9 +334,9 @@ LB_PRIVATE_IPS_ARR=($(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r '.
 LB_PRIVATE_IPS=$(echo ${LB_PRIVATE_IPS_ARR[@]} | tr ' ' ',')
 LB_PUBLIC_IPS_ARR=($(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r '.public_ips[].address | @sh' | tr -d \'))
 LB_PUBLIC_IP=$(echo ${LB_PUBLIC_IPS_ARR[@]} | tr ' ' ',')
-LB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r .hostname)
+LB_PUBLIC_HOSTNAME=$(ibmcloud is load-balancer $NLB_ID --output JSON | jq -r ".hostname")
 ALL_LB_NAMES=${LB_PUBLIC_HOSTNAME},${LB_PRIVATE_IPS},${LB_PUBLIC_IP}
-BASTION_ID=$(ibmcloud is instances --resource-group-id $RG_ID --output JSON | jq -r '.[] | select(.name=="bastion") | .id')
+BASTION_ID=$(ibmcloud is instances --resource-group-id $RG_ID --output JSON | jq -r '.[] | select(.name=="kube-thw-ibmvpc-bastion") | .id')
 BASTION_IP=$(ibmcloud is floating-ip $FIP_ID --output JSON | jq -r ".address")
 KUBERNETES_PUBLIC_ADDRESS=$LB_PUBLIC_IP
 ```

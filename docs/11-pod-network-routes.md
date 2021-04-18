@@ -9,8 +9,9 @@ In this lab you will create a route for each worker node that maps the node's Po
 ## Hostname Resolution
 
 In some VPCs, there are services to automatically resolve hostnames on a subnet. To manually apply these updates, update
-the file named `/etc/hosts` on each of the three controllers and the three workers. The extra lines to add are as follows:\
+the file named `/etc/hosts` on each of the three controllers and the three workers. The extra lines to add are as follows:
 
+```
 IP ADDRESSES
 ------------
 10.240.0.10 controller-0
@@ -19,6 +20,7 @@ IP ADDRESSES
 10.240.0.20 worker-0
 10.240.0.21 worker-1
 10.240.0.22 worker-2
+```
 
 **NOTE:** You should remove the entry associated with the current compute instance. So for example, when updating the
 `hosts` file for worker-0, remove the following line from the above list: `10.240.0.20 worker-0`

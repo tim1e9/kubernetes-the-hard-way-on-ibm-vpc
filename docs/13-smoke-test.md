@@ -181,7 +181,8 @@ NODE_PORT=$(kubectl get svc nginx \
   --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
 ```
 
-Create another floating IP address, and assign it to the node.
+Create another floating IP address, and assign it to the node. (**NOTE:** You'll also need to update the security
+group to expose the port.)
 
 Make an HTTP request using the external IP address and the `nginx` node port:
 
@@ -202,5 +203,10 @@ Connection: keep-alive
 ETag: "5f049a39-264"
 Accept-Ranges: bytes
 ```
+
+## Bonus - UI Dashboard
+
+Follow the instructions for deploying the [Web UI Dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+
 
 Next: [Cleaning Up](14-cleanup.md)

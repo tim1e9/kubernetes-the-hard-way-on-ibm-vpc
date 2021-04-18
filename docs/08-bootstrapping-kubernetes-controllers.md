@@ -351,7 +351,11 @@ create a back-end pool, and add the compute machines to the pool:
 ```
 NLB_POOL_ID=$(ibmcloud is load-balancer-pool-create kube-thw-ibmvpc-nlb-pool $NLB_ID round_robin tcp 5 2 2 http \
   --health-monitor-url /healthz --health-monitor-port 80 --output JSON | jq -r ".id")
+```
 
+Run each of the following one at a time, and provide sufficient time to allow the updates to be applied:
+
+```
 ibmcloud is load-balancer-pool-member-create $NLB_ID $NLB_POOL_ID 6443 $CTRLR0_ID
 ibmcloud is load-balancer-pool-member-create $NLB_ID $NLB_POOL_ID 6443 $CTRLR1_ID
 ibmcloud is load-balancer-pool-member-create $NLB_ID $NLB_POOL_ID 6443 $CTRLR2_ID
