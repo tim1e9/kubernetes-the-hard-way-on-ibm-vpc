@@ -1,7 +1,7 @@
 # Kubernetes The Hard Way - On IBM VPC
 
 This tutorial is a fork of the great work that Kelsey Hightower originally created. And quite
-frankly, all I've done is convert this Google Cloud directions into the IBM Virtual Private
+frankly, all I've done is convert the Google Cloud directions into the IBM Virtual Private
 Cloud (VPC) equivalent. I strongly recommend you read and star
 [his repo](https://github.com/kelseyhightower/kubernetes-the-hard-way).
 
